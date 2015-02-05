@@ -1,0 +1,79 @@
+#!/bin/sh
+
+# sudo apt-get install php5-cli php5-curl curl libav-tools libxml2-utils
+
+DL_DIR="$PWD"
+ADOBEHDS="/opt/adobehds/AdobeHDS.php"
+USER_AGENT="Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:35.0) Gecko/20100101 Firefox/35.0"
+
+if [ "$#" -ne 1 ]; then
+	echo "Usage: $0 URL" >&2
+	exit 1
+fi
+
+AVCONV=`which avconv`
+CURL=`which curl`
+PHP=`which php`
+RM=`which rm`
+
+# check for AdobeHDS.php
+if [ ! -e $ADOBEHDS ]; then
+	echo "ERROR: please install AdobeHDS.php" >&2
+	exit 1
+fi
+
+# check for avconv
+if [ -z $AVCONV ]; then
+	echo "ERROR: please install avconv" >&2
+	exit 1
+fi
+
+# check for curl
+if [ -z $CURL ]; then
+	echo "ERROR: please install curl" >&2
+	exit 1
+fi
+
+# check for php
+if [ -z $PHP ]; then
+	echo "ERROR: please install php" >&2
+	exit 1
+fi
+
+ID=${1#*=}
+XML_URL="http://il.srgssr.ch/integrationlayer/1.0/ue/rts/video/play/$ID.xml"
+XML_FILE="/tmp/tmp_$ID.xml"
+
+$CURL -s -o "$XML_FILE" "$XML_URL"
+
+# extract manifest url
+MANIFEST_URL=`xmllint --xpath "/Video/Playlists/Playlist[@protocol='HTTP-HDS']/url[@quality='SD']/text()" "$XML_FILE"`
+
+# extract infos from xml file to set video name
+CHANNEL="RTS"
+PROGRAM=`xmllint --xpath "/Video/AssetSet/title/text()" "$XML_FILE"`
+TITLE=`xmllint --xpath "/Video/AssetMetadatas/AssetMetadata/title/text()" "$XML_FILE"`
+VIDEO_NAME="$CHANNEL - $PROGRAM - $TITLE"
+
+$RM -f "$XML_FILE"
+
+# remove "http://rtsww-f.akamaihd.net" from the beginning
+STREAM_URL=`echo $MANIFEST_URL | cut -c28-`
+
+# remove "manifest.f4m" from the end
+STREAM_URL=`echo $STREAM_URL | cut -c-$((${#STREAM_URL}-12))`
+
+# get authparams
+$CURL -s -o "$XML_FILE" "http://tp.srgssr.ch/token/akahd.xml?stream=$STREAM_URL*"
+AUTH_PARAMS=`xmllint --xpath "/token/authparams/text()" "$XML_FILE"`
+
+$RM -f "$XML_FILE"
+
+# download flv video
+(cd /tmp && $PHP $ADOBEHDS --manifest "$MANIFEST_URL?$AUTH_PARAMS&g=KEELPSHKBDEC&hdcore=3.4.0&plugin=aasp-3.4.0.132.66" --outfile "$DL_DIR/$VIDEO_NAME.flv.part" --useragent "$USER_AGENT" --delete)
+
+# convert it to mp4
+$AVCONV -i "$DL_DIR/$VIDEO_NAME.flv.part" -codec copy "$DL_DIR/$VIDEO_NAME.mp4"
+
+# remove temporary flv video
+$RM -f "$DL_DIR/$VIDEO_NAME.flv.part"
