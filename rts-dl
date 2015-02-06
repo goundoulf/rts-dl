@@ -11,31 +11,31 @@ if [ "$#" -ne 1 ]; then
 	exit 1
 fi
 
-AVCONV=`which avconv`
-CURL=`which curl`
-PHP=`which php`
-RM=`which rm`
+AVCONV=$(which avconv)
+CURL=$(which curl)
+PHP=$(which php)
+RM=$(which rm)
 
 # check for AdobeHDS.php
-if [ ! -e $ADOBEHDS ]; then
+if [ ! -e "$ADOBEHDS" ]; then
 	echo "ERROR: please install AdobeHDS.php" >&2
 	exit 1
 fi
 
 # check for avconv
-if [ -z $AVCONV ]; then
+if [ -z "$AVCONV" ]; then
 	echo "ERROR: please install avconv" >&2
 	exit 1
 fi
 
 # check for curl
-if [ -z $CURL ]; then
+if [ -z "$CURL" ]; then
 	echo "ERROR: please install curl" >&2
 	exit 1
 fi
 
 # check for php
-if [ -z $PHP ]; then
+if [ -z "$PHP" ]; then
 	echo "ERROR: please install php" >&2
 	exit 1
 fi
@@ -51,21 +51,21 @@ MANIFEST_URL=`xmllint --xpath "/Video/Playlists/Playlist[@protocol='HTTP-HDS']/u
 
 # extract infos from xml file to set video name
 CHANNEL="RTS"
-PROGRAM=`xmllint --xpath "/Video/AssetSet/title/text()" "$XML_FILE"`
-TITLE=`xmllint --xpath "/Video/AssetMetadatas/AssetMetadata/title/text()" "$XML_FILE"`
+PROGRAM=$(xmllint --xpath "/Video/AssetSet/title/text()" "$XML_FILE")
+TITLE=$(xmllint --xpath "/Video/AssetMetadatas/AssetMetadata/title/text()" "$XML_FILE")
 VIDEO_NAME="$CHANNEL - $PROGRAM - $TITLE"
 
 $RM -f "$XML_FILE"
 
 # remove "http://rtsww-f.akamaihd.net" from the beginning
-STREAM_URL=`echo $MANIFEST_URL | cut -c28-`
+STREAM_URL=$(echo "$MANIFEST_URL" | cut -c28-)
 
 # remove "manifest.f4m" from the end
-STREAM_URL=`echo $STREAM_URL | cut -c-$((${#STREAM_URL}-12))`
+STREAM_URL=$(echo "$STREAM_URL" | cut -c-$((${#STREAM_URL}-12)))
 
 # get authparams
 $CURL -s -o "$XML_FILE" "http://tp.srgssr.ch/token/akahd.xml?stream=$STREAM_URL*"
-AUTH_PARAMS=`xmllint --xpath "/token/authparams/text()" "$XML_FILE"`
+AUTH_PARAMS=$(xmllint --xpath "/token/authparams/text()" "$XML_FILE")
 
 $RM -f "$XML_FILE"
 
